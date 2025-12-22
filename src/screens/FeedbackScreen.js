@@ -29,52 +29,52 @@ const FeedbackScreen = () => {
       </View>
 
       <View style={styles.form}>
-        <Text style={[styles.label, { color: theme.textColor }]}>反馈内容</Text>
+        <Text style={[styles.label, { color: theme.text }]}>反馈内容</Text>
         <TextInput
-          style={[styles.input, { backgroundColor: theme.cardBackgroundColor, color: theme.textColor }]}
+          style={[styles.input, { backgroundColor: theme.card, color: theme.text }]}
           multiline
           numberOfLines={6}
           placeholder="请输入您的反馈意见..."
-          placeholderTextColor={theme.textColor + '80'}
+          placeholderTextColor={theme.textSecondary}
           value={feedback}
           onChangeText={setFeedback}
         />
 
-        <Text style={[styles.label, { color: theme.textColor }]}>联系方式</Text>
+        <Text style={[styles.label, { color: theme.text }]}>联系方式</Text>
         <View style={styles.contactOptions}>
           <TouchableOpacity
             style={[
               styles.contactOption,
               contactMethod === 'wechat' && { borderColor: '#07C160' },
-              { backgroundColor: theme.cardBackgroundColor, borderColor: theme.borderColor }
+              { backgroundColor: theme.card, borderColor: theme.textSecondary }
             ]}
             onPress={() => setContactMethod('wechat')}
           >
-            <Text style={[styles.contactOptionText, { color: theme.textColor }]}>微信</Text>
+            <Text style={[styles.contactOptionText, { color: theme.text }]}>微信</Text>
             <Text style={[styles.contactOptionIcon]}>💬</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[
               styles.contactOption,
               contactMethod === 'email' && { borderColor: '#1890FF' },
-              { backgroundColor: theme.cardBackgroundColor, borderColor: theme.borderColor }
+              { backgroundColor: theme.card, borderColor: theme.textSecondary }
             ]}
             onPress={() => setContactMethod('email')}
           >
-            <Text style={[styles.contactOptionText, { color: theme.textColor }]}>邮箱</Text>
+            <Text style={[styles.contactOptionText, { color: theme.text }]}>邮箱</Text>
             <Text style={[styles.contactOptionIcon]}>📧</Text>
           </TouchableOpacity>
         </View>
 
         {contactMethod === 'wechat' && (
           <View style={styles.contactInfo}>
-            <Text style={[styles.contactInfoText, { color: theme.textColor }]}>微信：sleepwell_official</Text>
+            <Text style={[styles.contactInfoText, { color: theme.text }]}>微信：sleepwell_official</Text>
           </View>
         )}
 
         {contactMethod === 'email' && (
           <View style={styles.contactInfo}>
-            <Text style={[styles.contactInfoText, { color: theme.textColor }]}>邮箱：feedback@sleepwell.com</Text>
+            <Text style={[styles.contactInfoText, { color: theme.text }]}>邮箱：feedback@sleepwell.com</Text>
           </View>
         )}
 

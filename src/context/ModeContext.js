@@ -42,30 +42,32 @@ export const ModeContextProvider = ({ children }) => {
     );
   };
 
-  // 切换卡片可见性
-  const toggleCardVisibility = (cardId) => {
-    // 确保设置卡片不能被删除
-    if (cardId === 'settings') {
-      return;
-    }
-    
-    setCustomMenuItems(prev => {
-      const updatedItems = prev.map(item => {
-        if (item.id === cardId) {
-          const newItem = { ...item, visible: !item.visible };
-          if (!newItem.visible) {
-            setHiddenMenuItems(prevHidden => [...prevHidden, newItem]);
-          }
-          return newItem;
-        }
-        return item;
-      });
-      return updatedItems.filter(item => item.visible);
-    });
-    
-    // 从隐藏列表中移除如果重新显示
-    setHiddenMenuItems(prev => prev.filter(item => item.id !== cardId));
-  };
+ // 切换卡片可见性
+   const toggleCardVisibility = (cardId) => {
+     // 确保设置卡片不能被删除
+     if (cardId === 'settings') {
+       return;
+     }
+
+     // 查找当前卡片
+     const currentCard = customMenuItems.find(item => item.id === cardId);
+
+     if (currentCard) {
+       if (currentCard.visible) {
+         // 隐藏卡片：只更新visible属性，不移除
+         setCustomMenuItems(prev => prev.map(item =>
+           item.id === cardId ? { ...item, visible: false } : item
+         ));
+         setHiddenMenuItems(prev => [...prev, { ...currentCard, visible: false }]);
+       } else {
+         // 显示卡片：只更新visible属性
+         setCustomMenuItems(prev => prev.map(item =>
+           item.id === cardId ? { ...item, visible: true } : item
+         ));
+         setHiddenMenuItems(prev => prev.filter(item => item.id !== cardId));
+       }
+     }
+   };
 
   // 将隐藏卡片移回自定义列表
   const restoreHiddenCard = (cardId) => {
@@ -88,6 +90,17 @@ export const ModeContextProvider = ({ children }) => {
     });
   };
 
+  // 将卡片置顶
+  // 确保pinCard函数接受索引参数
+  const pinCard = (index) => {
+    setCustomMenuItems(prev => {
+      const result = Array.from(prev);
+      const [removed] = result.splice(index, 1);
+      result.unshift(removed);
+      return result;
+    });
+  };
+
   // 设置选中卡片（用于抓牌模式）
   const setSelectedCardId = (cardId) => {
     setSelectedCard(cardId);
@@ -106,6 +119,7 @@ export const ModeContextProvider = ({ children }) => {
         toggleCardVisibility,
         restoreHiddenCard,
         reorderCards,
+        pinCard,
         setSelectedCardId,
         modes: {
           traditional: MODE_TRADITIONAL,

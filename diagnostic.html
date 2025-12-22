@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8" />
+    <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <title>SleepWell - 诊断页面</title>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; 
+            margin: 20px; 
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-result { 
+            margin: 10px 0; 
+            padding: 15px; 
+            border-radius: 8px;
+            border-left: 4px solid;
+            font-size: 14px;
+        }
+        .success { 
+            background: #d4edda; 
+            color: #155724; 
+            border-left-color: #28a745;
+        }
+        .error { 
+            background: #f8d7da; 
+            color: #721c24; 
+            border-left-color: #dc3545;
+        }
+        .warning { 
+            background: #fff3cd; 
+            color: #856404; 
+            border-left-color: #ffc107;
+        }
+        .info { 
+            background: #d1ecf1; 
+            color: #0c5460; 
+            border-left-color: #17a2b8;
+        }
+        h1 { color: #333; text-align: center; }
+        .loading { text-align: center; padding: 20px; }
+        .spinner { 
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #4A90E2;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .error-details { 
+            background: #f8f9fa; 
+            padding: 10px; 
+            border-radius: 5px; 
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            margin-top: 10px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🛠️ SleepWell 应用诊断</h1>
+        <div id="test-results">
+            <div class="test-result info">正在诊断应用兼容性问题...</div>
+            <div class="loading">
+                <div class="spinner"></div>
+                <div>正在检测浏览器兼容性...</div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const results = document.getElementById('test-results');
+        let errorCount = 0;
+        
+        function addResult(message, type = 'success') {
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.innerHTML = message;
+            results.appendChild(div);
+            if (type === 'error') errorCount++;
+        }
+        
+        function clearLoading() {
+            const loading = results.querySelector('.loading');
+            if (loading) loading.remove();
+        }
+        
+        // 浏览器兼容性检测
+        setTimeout(() => {
+            clearLoading();
+            
+            addResult('<strong>🔍 浏览器环境检测</strong>', 'info');
+            
+            // 基础信息
+            addResult(`📱 User Agent: ${navigator.userAgent.substring(0, 100)}...`, 'warning');
+            addResult(`🌐 浏览器语言: ${navigator.language}`, 'warning');
+            addResult(`📏 屏幕尺寸: ${window.innerWidth}×${window.innerHeight}`, 'warning');
+            
+            // JavaScript支持检测
+            addResult('<strong>⚡ JavaScript 支持检测</strong>', 'info');
+            
+            try {
+                // ES6+ 特性测试
+                const es6Tests = [
+                    { name: '箭头函数', test: () => (() => true)() },
+                    { name: '模板字符串', test: () => `test ${1 + 1}` === 'test 2' },
+                    { name: '解构赋值', test: () => { const [a, b] = [1, 2]; return a === 1 && b === 2; } },
+                    { name: '扩展运算符', test: () => { const obj = {...{x: 1}, y: 2}; return obj.x === 1 && obj.y === 2; } },
+                    { name: 'Promise', test: () => typeof Promise !== 'undefined' },
+                    { name: 'async/await', test: () => { try { eval('async () => {}'); return true; } catch { return false; } } },
+                    { name: '类', test: () => { try { eval('class Test {}'); return true; } catch { return false; } } }
+                ];
+                
+                es6Tests.forEach(({name, test}) => {
+                    try {
+                        if (test()) {
+                            addResult(`✅ ${name}: 支持`);
+                        } else {
+                            addResult(`❌ ${name}: 不支持`, 'error');
+                        }
+                    } catch (e) {
+                        addResult(`❌ ${name}: 错误 - ${e.message}`, 'error');
+                    }
+                });
+                
+            } catch (e) {
+                addResult(`❌ JavaScript检测失败: ${e.message}`, 'error');
+            }
+            
+            // React Native Web 相关检测
+            addResult('<strong>🔧 React Native Web 兼容性检测</strong>', 'info');
+            
+            try {
+                // 检查必要的全局对象
+                const globalTests = [
+                    { name: 'window对象', obj: window },
+                    { name: 'document对象', obj: document },
+                    { name: 'globalThis对象', obj: globalThis },
+                    { name: 'requestAnimationFrame', obj: window.requestAnimationFrame }
+                ];
+                
+                globalTests.forEach(({name, obj}) => {
+                    if (obj) {
+                        addResult(`✅ ${name}: 存在`);
+                    } else {
+                        addResult(`❌ ${name}: 缺失`, 'error');
+                    }
+                });
+                
+                // DOM API检测
+                const domTests = [
+                    { name: 'getElementById', test: () => document.getElementById },
+                    { name: 'createElement', test: () => document.createElement },
+                    { name: 'addEventListener', test: () => window.addEventListener },
+                    { name: 'fetch API', test: () => window.fetch }
+                ];
+                
+                domTests.forEach(({name, test}) => {
+                    if (test()) {
+                        addResult(`✅ ${name}: 支持`);
+                    } else {
+                        addResult(`❌ ${name}: 不支持`, 'error');
+                        if (name === 'fetch API') {
+                            addResult('💡 提示: fetch API是加载应用资源的必要条件', 'warning');
+                        }
+                    }
+                });
+                
+            } catch (e) {
+                addResult(`❌ 环境检测失败: ${e.message}`, 'error');
+            }
+            
+            // 尝试加载应用脚本
+            addResult('<strong>📦 应用脚本加载测试</strong>', 'info');
+            
+            const script = document.createElement('script');
+            script.src = './_expo/static/js/web/AppEntry-e4617e58fe499b6e9b1217e203ffb406.js';
+            script.defer = true;
+            
+            script.onload = () => {
+                addResult('✅ 应用脚本加载成功');
+                
+                // 检查React Native是否初始化
+                setTimeout(() => {
+                    addResult('<strong>🚀 React Native 初始化检测</strong>', 'info');
+                    
+                    try {
+                        // 检查全局变量
+                        if (window.ReactNativeWeb) {
+                            addResult('✅ ReactNativeWeb全局变量存在');
+                        }
+                        
+                        // 检查root元素
+                        const rootElement = document.getElementById('root');
+                        if (rootElement) {
+                            addResult('✅ Root元素存在');
+                            
+                            // 检查是否有内容被渲染
+                            if (rootElement.children.length > 0) {
+                                addResult('✅ Root元素有子元素，应用可能已渲染');
+                            } else {
+                                addResult('⚠️ Root元素为空，应用可能未渲染', 'warning');
+                                addResult('💡 可能原因: JavaScript错误、依赖缺失或初始化失败', 'warning');
+                            }
+                        } else {
+                            addResult('❌ Root元素不存在', 'error');
+                        }
+                        
+                    } catch (e) {
+                        addResult(`❌ React Native检测失败: ${e.message}`, 'error');
+                    }
+                    
+                    addResult('<strong>📋 诊断完成</strong>', 'info');
+                    if (errorCount === 0) {
+                        addResult('🎉 未发现明显兼容性问题！应用应该可以正常工作。', 'success');
+                    } else {
+                        addResult(`⚠️ 发现 ${errorCount} 个潜在问题，请参考上面的建议。`, 'warning');
+                    }
+                }, 2000);
+            };
+            
+            script.onerror = (error) => {
+                addResult(`❌ 应用脚本加载失败`, 'error');
+                addResult(`💡 请检查:`, 'warning');
+                addResult(`   • 文件路径是否正确`);
+                addResult(`   • 文件是否存在`);
+                addResult(`   • 服务器是否正常运行`);
+                addResult(`   • 浏览器是否有网络访问权限`);
+                
+                // 尝试访问测试文件
+                fetch('./_expo/static/js/web/AppEntry-e4617e58fe499b6e9b1217e203ffb406.js')
+                    .then(response => {
+                        if (response.ok) {
+                            addResult(`✅ 文件可访问 (HTTP ${response.status})`);
+                        } else {
+                            addResult(`❌ 文件访问失败 (HTTP ${response.status})`, 'error');
+                        }
+                    })
+                    .catch(err => {
+                        addResult(`❌ 网络请求失败: ${err.message}`, 'error');
+                    });
+            };
+            
+            document.head.appendChild(script);
+            
+            // 监听全局错误
+            window.addEventListener('error', (event) => {
+                addResult(`❌ 全局错误: ${event.message}`, 'error');
+                if (event.filename) {
+                    addResult(`📁 错误文件: ${event.filename}:${event.lineno}:${event.colno}`, 'warning');
+                }
+            });
+            
+            window.addEventListener('unhandledrejection', (event) => {
+                addResult(`❌ 未处理的Promise拒绝: ${event.reason}`, 'error');
+            });
+            
+        }, 1000);
+    </script>
+</body>
+</html>

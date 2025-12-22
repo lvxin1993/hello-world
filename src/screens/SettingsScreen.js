@@ -1,314 +1,208 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Pressable, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { useThemeContext } from '../context/ThemeContext';
 import { useModeContext, MODE_TRADITIONAL, MODE_ROTATING, MODE_CARD_GRAB } from '../context/ModeContext';
+import { useSleepContext } from '../context/SleepContext';
+import { useNavigation } from '@react-navigation/native';
+import { responsiveFontSize, responsiveSize, spacing } from '../utils/responsive';
 
 const SettingsScreen = () => {
-  const { getTheme } = useThemeContext();
-  const { 
-    currentMode, 
-    toggleMode, 
-    rotationDirection, 
+  const { theme, toggleTheme, currentTheme } = useThemeContext();
+  const {
+    currentMode,
+    toggleMode,
+    rotationDirection,
     toggleRotationDirection,
     customMenuItems,
     hiddenMenuItems,
     toggleCardVisibility,
     restoreHiddenCard,
-    reorderCards
+    reorderCards,
+    pinCard
   } = useModeContext();
+  const navigation = useNavigation();
+  const { sleepRecord, updateSleepRecord } = useSleepContext();
   
-  const theme = getTheme().colors;
-  const [dragFromIndex, setDragFromIndex] = useState(null);
-  const [showAllCards, setShowAllCards] = useState(true);
-  const [showVisibleCards, setShowVisibleCards] = useState(true);
   const [showHiddenCards, setShowHiddenCards] = useState(true);
-
-  // 置顶卡片
-  const pinCard = (index) => {
-    if (index === 0) return; // 已经是第一个
-    
-    // 调用reorderCards函数，将卡片从当前位置移到第一个位置
-    reorderCards(index, 0);
-  };
-
-  // 展开/全部隐藏卡片
-  const toggleAllCardsVisibility = () => {
-    if (showAllCards) {
-      // 全部隐藏（除了设置卡片）
-      customMenuItems.forEach(item => {
-        if (item.id !== 'settings') {
-          toggleCardVisibility(item.id);
-        }
-      });
-    } else {
-      // 全部展开
-      hiddenMenuItems.forEach(item => {
-        restoreHiddenCard(item.id);
-      });
-    }
-    
-    // 切换状态
-    setShowAllCards(!showAllCards);
-  };
-
-  // 开始拖拽
-  const handleLongPress = (index) => {
-    setDragFromIndex(index);
-    Alert.alert('功能提示', `开始拖拽卡片 ${index}`);
-  };
-
-  // 结束拖拽
-  const handlePress = (toIndex) => {
-    if (dragFromIndex !== null && dragFromIndex !== toIndex) {
-      Alert.alert('功能提示', `将卡片从 ${dragFromIndex} 拖到 ${toIndex}`);
-      // 实际更新卡片顺序
-      reorderCards(dragFromIndex, toIndex);
-    }
-    setDragFromIndex(null);
-  };
-
+  
+  // 过滤出可见的卡片
+  const visibleCards = customMenuItems.filter(item => item.visible);
+  
   return (
-    <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
+    <ScrollView 
+      style={[styles.container, { backgroundColor: theme.background }]}
+      contentContainerStyle={styles.contentContainer}
+    >
       <Text style={[styles.title, { color: theme.text }]}>设置</Text>
       
-      {/* 显示模式设置 */}
+      {/* Theme Section */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>主题</Text>
+        <TouchableOpacity 
+          style={[styles.optionButton, { backgroundColor: theme.card }]} 
+          onPress={toggleTheme}
+        >
+          <Text style={[styles.optionText, { color: theme.text }]}>
+            {currentTheme === 'light' ? '切换到深色主题' : '切换到浅色主题'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+      
+      {/* Mode Section */}
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: theme.text }]}>显示模式</Text>
         <View style={styles.optionGrid}>
-          <TouchableOpacity
+          <TouchableOpacity 
             style={[
-              styles.optionButton,
+              styles.optionButton, 
               { backgroundColor: currentMode === MODE_TRADITIONAL ? theme.primary : theme.card }
-            ]}
+            ]} 
             onPress={() => toggleMode(MODE_TRADITIONAL)}
           >
             <Text style={[
-              styles.optionButtonText,
-              { color: currentMode === MODE_TRADITIONAL ? '#FFFFFF' : theme.text }
-            ]}>传统模式</Text>
+              styles.optionText, 
+              { color: currentMode === MODE_TRADITIONAL ? theme.text : theme.text }
+            ]}>传统</Text>
           </TouchableOpacity>
-          
-          <TouchableOpacity
+          <TouchableOpacity 
             style={[
-              styles.optionButton,
+              styles.optionButton, 
               { backgroundColor: currentMode === MODE_ROTATING ? theme.primary : theme.card }
-            ]}
+            ]} 
             onPress={() => toggleMode(MODE_ROTATING)}
           >
             <Text style={[
-              styles.optionButtonText,
-              { color: currentMode === MODE_ROTATING ? '#FFFFFF' : theme.text }
-            ]}>转动模式</Text>
+              styles.optionText, 
+              { color: currentMode === MODE_ROTATING ? theme.text : theme.text }
+            ]}>旋转</Text>
           </TouchableOpacity>
-          
-          <TouchableOpacity
+          <TouchableOpacity 
             style={[
-              styles.optionButton,
+              styles.optionButton, 
               { backgroundColor: currentMode === MODE_CARD_GRAB ? theme.primary : theme.card }
-            ]}
+            ]} 
             onPress={() => toggleMode(MODE_CARD_GRAB)}
           >
             <Text style={[
-              styles.optionButtonText,
-              { color: currentMode === MODE_CARD_GRAB ? '#FFFFFF' : theme.text }
-            ]}>抓牌模式</Text>
+              styles.optionText, 
+              { color: currentMode === MODE_CARD_GRAB ? theme.text : theme.text }
+            ]}>卡片抓取</Text>
           </TouchableOpacity>
         </View>
         
-        {/* 转动模式设置 */}
+        {/* Rotation Direction Option */}
         {currentMode === MODE_ROTATING && (
-          <View style={styles.subSection}>
-            <Text style={[styles.subSectionTitle, { color: theme.text }]}>转动方向</Text>
-            <TouchableOpacity
-              style={[styles.directionButton, { backgroundColor: theme.primary }]}
-              onPress={toggleRotationDirection}
-            >
-              <Text style={styles.directionButtonText}>
-                当前: {rotationDirection === 'clockwise' ? '顺时针' : '逆时针'}
-              </Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity 
+            style={[styles.optionButton, { backgroundColor: theme.card, marginTop: spacing(15) }]} 
+            onPress={toggleRotationDirection}
+          >
+            <Text style={[styles.optionText, { color: theme.text }]}>
+              旋转方向: {rotationDirection === 'clockwise' ? '顺时针' : '逆时针'}
+            </Text>
+          </TouchableOpacity>
         )}
       </View>
       
-      {/* 卡片管理设置 */}
+      {/* Card Management Section */}
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>卡片管理</Text>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>我的卡片</Text>
         
-        {/* 展开/全部隐藏卡片内容按钮 */}
-        <View style={styles.cardControls}>
-          <TouchableOpacity
-            style={[styles.expandButton, { backgroundColor: theme.primary, marginRight: 10 }]}
-            onPress={toggleAllCardsVisibility}
-          >
-            <Text style={styles.expandButtonText}>
-              {showAllCards ? '全部隐藏卡片' : '展开所有卡片'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-        
-        {/* 显示的卡片 - 可展开/折叠 */}
+        {/* Visible Cards Section */}
         <View style={styles.cardManagementSection}>
-          {/* 可点击的标题，用于展开/折叠 */}
-          <TouchableOpacity
-            style={styles.cardSectionHeader}
-            onPress={() => setShowVisibleCards(!showVisibleCards)}
-          >
+          <View style={[styles.cardSectionHeader, { backgroundColor: theme.card }]}>
             <View style={styles.cardSectionHeaderContent}>
-              <Text style={[styles.cardSectionTitle, { color: theme.text }]}>显示的卡片</Text>
-              <Text style={[styles.cardCount, { color: theme.textSecondary }]}>({customMenuItems.length})</Text>
+              <Text style={[styles.cardSectionTitle, { color: theme.text }]}>可见卡片</Text>
+              <Text style={[styles.cardCount, { color: theme.textSecondary }]}>({visibleCards.length})</Text>
             </View>
-            <Text style={[styles.arrowIcon, { color: theme.textSecondary }]}>
-              {showVisibleCards ? '▼' : '▶'}
-            </Text>
-          </TouchableOpacity>
+          </View>
           
-          {/* 显示的卡片列表 */}
-          {showVisibleCards && (
+          {visibleCards.length > 0 ? (
             <View style={styles.cardList}>
-              {customMenuItems.map((item, index) => (
-                <Pressable
-                  key={item.id}
-                  style={[styles.cardItem, { backgroundColor: theme.card }]}
-                  onPress={() => handlePress(index)}
-                  onLongPress={() => handleLongPress(index)}
-                  delayLongPress={500}
-                >
+              {visibleCards.map((card, index) => (
+                <View key={card.id} style={[styles.cardItem, { backgroundColor: theme.card }]}>
                   <View style={styles.cardContent}>
-                    <Text style={[styles.cardTitle, { color: theme.text }]}>{item.title}</Text>
+                    <Text style={[styles.cardTitle, { color: theme.text }]}>{card.title}</Text>
+                    <Text style={[styles.cardDescription, { color: theme.textSecondary }]}>{card.description}</Text>
                   </View>
                   <View style={styles.cardActions}>
-                    {item.id !== 'settings' && (
-                      <TouchableOpacity
-                        style={[styles.actionButton, styles.hideButton, { backgroundColor: theme.secondary }]}
-                        onPress={() => toggleCardVisibility(item.id)}
-                      >
-                        <Text style={styles.actionButtonText}>隐藏</Text>
-                      </TouchableOpacity>
-                    )}
-                    <TouchableOpacity
-                      style={[styles.actionButton, styles.pinButton, { backgroundColor: theme.primary }]}
+                    <TouchableOpacity 
+                      style={[styles.actionButton, styles.pinButton]} 
                       onPress={() => pinCard(index)}
-                      disabled={index === 0}
                     >
                       <Text style={styles.actionButtonText}>置顶</Text>
                     </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[styles.actionButton, styles.hideButton]} 
+                      onPress={() => toggleCardVisibility(card.id)}
+                    >
+                      <Text style={styles.actionButtonText}>隐藏</Text>
+                    </TouchableOpacity>
                   </View>
-                </Pressable>
+                </View>
               ))}
             </View>
+          ) : (
+            <Text style={[styles.noCardsText, { color: theme.textSecondary }]}>没有可见卡片</Text>
           )}
         </View>
         
-        {/* 隐藏的卡片 - 可展开/折叠 */}
-        <View style={styles.cardManagementSection}>
-          {/* 可点击的标题，用于展开/折叠 */}
-          <TouchableOpacity
-            style={styles.cardSectionHeader}
-            onPress={() => setShowHiddenCards(!showHiddenCards)}
-          >
-            <View style={styles.cardSectionHeaderContent}>
-              <Text style={[styles.cardSectionTitle, { color: theme.text }]}>隐藏的卡片</Text>
-              <Text style={[styles.cardCount, { color: theme.textSecondary }]}>({hiddenMenuItems.length})</Text>
-            </View>
-            <Text style={[styles.arrowIcon, { color: theme.textSecondary }]}>
-              {showHiddenCards ? '▼' : '▶'}
-            </Text>
-          </TouchableOpacity>
-          
-          {/* 隐藏的卡片列表 */}
-          {showHiddenCards && (
-            <View style={styles.cardList}>
-              {hiddenMenuItems.length > 0 ? (
-                hiddenMenuItems.map((item) => (
-                  <View key={item.id} style={[styles.cardItem, { backgroundColor: theme.card }]}>
-                    <View style={styles.cardContent}>
-                    <Text style={[styles.cardTitle, { color: theme.text, opacity: 0.7 }]}>{item.title}</Text>
-                  </View>
-                    <TouchableOpacity
-                      style={[styles.actionButton, styles.restoreButton, { backgroundColor: theme.primary }]}
-                      onPress={() => restoreHiddenCard(item.id)}
-                    >
-                      <Text style={styles.actionButtonText}>恢复</Text>
-                    </TouchableOpacity>
-                  </View>
-                ))
-              ) : (
-                <Text style={[styles.noCardsText, { color: theme.textSecondary }]}>没有隐藏的卡片</Text>
-              )}
-            </View>
-          )}
-        </View>
+        {/* Hidden Cards Section */}
+        <TouchableOpacity 
+          style={[styles.cardSectionHeader, { backgroundColor: theme.card, marginTop: spacing(20) }]} 
+          onPress={() => setShowHiddenCards(!showHiddenCards)}
+        >
+          <View style={styles.cardSectionHeaderContent}>
+            <Text style={[styles.cardSectionTitle, { color: theme.text }]}>隐藏卡片</Text>
+            <Text style={[styles.cardCount, { color: theme.textSecondary }]}>({hiddenMenuItems.length})</Text>
+          </View>
+          <Text style={[styles.arrowIcon, { color: theme.textSecondary }]}>
+            {showHiddenCards ? '▼' : '▶'}
+          </Text>
+        </TouchableOpacity>
+        
+        {showHiddenCards && hiddenMenuItems.length > 0 && (
+          <View style={styles.cardList}>
+            {hiddenMenuItems.map((card, index) => (
+              <View key={card.id} style={[styles.cardItem, { backgroundColor: theme.card, opacity: 0.8 }]}>
+                <View style={styles.cardContent}>
+                  <Text style={[styles.cardTitle, { color: theme.text }]}>{card.title}</Text>
+                  <Text style={[styles.cardDescription, { color: theme.textSecondary }]}>{card.description}</Text>
+                </View>
+                <View style={styles.cardActions}>
+                  <TouchableOpacity 
+                    style={[styles.actionButton, styles.restoreButton]} 
+                    onPress={() => restoreHiddenCard(card.id)}
+                  >
+                    <Text style={styles.actionButtonText}>恢复</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+        
+        {showHiddenCards && hiddenMenuItems.length === 0 && (
+          <Text style={[styles.noCardsText, { color: theme.textSecondary }]}>没有隐藏卡片</Text>
+        )}
       </View>
       
-      {/* 主题设置 */}
+      {/* Sleep Settings Section */}
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>主题设置</Text>
-        <View style={styles.optionGrid}>
-          <TouchableOpacity style={[styles.optionButton, { backgroundColor: theme.card }]}>
-            <Text style={[styles.optionButtonText, { color: theme.text }]}>浅色主题</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={[styles.optionButton, { backgroundColor: theme.card }]}>
-            <Text style={[styles.optionButtonText, { color: theme.text }]}>深色主题</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={[styles.optionButton, { backgroundColor: theme.card }]}>
-            <Text style={[styles.optionButtonText, { color: theme.text }]}>自动主题</Text>
-          </TouchableOpacity>
-        </View>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>睡眠设置</Text>
+        <TouchableOpacity 
+          style={[styles.optionButton, { backgroundColor: theme.card }]} 
+          onPress={() => navigation.navigate('SleepTimer')}
+        >
+          <Text style={[styles.optionText, { color: theme.text }]}>睡眠定时器</Text>
+        </TouchableOpacity>
       </View>
       
-      {/* 通知设置 */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>通知设置</Text>
-        <View style={styles.optionList}>
-          <TouchableOpacity style={styles.optionItem}>
-            <Text style={[styles.optionText, { color: theme.text }]}>睡眠提醒</Text>
-            <Text style={[styles.optionValue, { color: theme.textSecondary }]}>已开启</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.optionItem}>
-            <Text style={[styles.optionText, { color: theme.text }]}>每日统计</Text>
-            <Text style={[styles.optionValue, { color: theme.textSecondary }]}>已开启</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.optionItem}>
-            <Text style={[styles.optionText, { color: theme.text }]}>社区通知</Text>
-            <Text style={[styles.optionValue, { color: theme.textSecondary }]}>已关闭</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-      
-      {/* 音效设置 */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>音效设置</Text>
-        <View style={styles.optionList}>
-          <TouchableOpacity style={styles.optionItem}>
-            <Text style={[styles.optionText, { color: theme.text }]}>默认铃声</Text>
-            <Text style={[styles.optionValue, { color: theme.textSecondary }]}>海洋声</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.optionItem}>
-            <Text style={[styles.optionText, { color: theme.text }]}>音量</Text>
-            <Text style={[styles.optionValue, { color: theme.textSecondary }]}>70%</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-      
-      {/* 关于 */}
+      {/* About Section */}
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: theme.text }]}>关于</Text>
-        <View style={styles.optionList}>
-          <TouchableOpacity style={styles.optionItem}>
-            <Text style={[styles.optionText, { color: theme.text }]}>版本</Text>
-            <Text style={[styles.optionValue, { color: theme.textSecondary }]}>1.0.0</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.optionItem}>
-            <Text style={[styles.optionText, { color: theme.text }]}>开发者</Text>
-            <Text style={[styles.optionValue, { color: theme.textSecondary }]}>SleepWell Team</Text>
-          </TouchableOpacity>
+        <View style={styles.aboutInfo}>
+          <Text style={[styles.aboutText, { color: theme.text }]}>版本: 1.0.0</Text>
+          <Text style={[styles.aboutText, { color: theme.text }]}>开发者: 梦境探索团队</Text>
         </View>
       </View>
     </ScrollView>
@@ -318,32 +212,25 @@ const SettingsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
+  },
+  contentContainer: {
+    padding: spacing(20),
+    paddingBottom: spacing(40),
+    minHeight: '100%',
   },
   title: {
-    fontSize: 28,
+    fontSize: responsiveFontSize(28),
     fontWeight: 'bold',
-    marginBottom: 20,
+    marginBottom: spacing(20),
   },
   section: {
-    marginBottom: 30,
+    marginBottom: spacing(30),
     backgroundColor: 'transparent',
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: responsiveFontSize(20),
     fontWeight: 'bold',
-    marginBottom: 15,
-  },
-  subSection: {
-    marginTop: 20,
-    paddingTop: 15,
-    borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
-  },
-  subSectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 10,
+    marginBottom: spacing(15),
   },
   optionGrid: {
     flexDirection: 'row',
@@ -352,9 +239,9 @@ const styles = StyleSheet.create({
   },
   optionButton: {
     width: '32%',
-    padding: 15,
-    borderRadius: 12,
-    marginBottom: 15,
+    padding: spacing(15),
+    borderRadius: responsiveSize(12),
+    marginBottom: spacing(15),
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: {
@@ -365,51 +252,26 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  optionButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  optionList: {
-    backgroundColor: 'transparent',
-  },
-  optionItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    backgroundColor: 'transparent',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-  },
   optionText: {
-    fontSize: 16,
+    fontSize: responsiveFontSize(16),
+    fontWeight: '500',
   },
-  optionValue: {
-    fontSize: 14,
+  aboutInfo: {
+    padding: spacing(15),
+    backgroundColor: 'transparent',
+    borderRadius: responsiveSize(12),
   },
-  directionButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
+  aboutText: {
+    fontSize: responsiveFontSize(16),
+    marginBottom: spacing(5),
   },
-  directionButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  // 卡片管理样式
+  // Card management styles
   cardManagementSection: {
     marginBottom: 20,
   },
   cardSectionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 10,
   },
   cardItem: {
     flexDirection: 'row',
@@ -469,58 +331,30 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     padding: 20,
   },
-  // 展开/全部隐藏按钮样式
-  expandButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 15,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  expandButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  // 卡片控制按钮容器
   cardControls: {
     flexDirection: 'row',
     marginBottom: 15,
   },
-  // 卡片部分标题栏，可点击展开/折叠
   cardSectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 10,
     borderRadius: 8,
-    backgroundColor: theme.background,
     marginBottom: 10,
   },
   cardSectionHeaderContent: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  // 卡片数量
   cardCount: {
     fontSize: 14,
     marginLeft: 8,
   },
-  // 箭头图标
   arrowIcon: {
     fontSize: 14,
     fontWeight: 'bold',
   },
-  // 卡片列表容器
   cardList: {
     marginLeft: 10,
   },

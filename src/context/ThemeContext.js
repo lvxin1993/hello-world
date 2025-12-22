@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext } from 'react';
+import React, { createContext, useState, useContext, useEffect } from 'react';
 
 // 创建默认主题对象
 const defaultThemeColors = {
@@ -52,12 +52,35 @@ const themes = {
 
 export const ThemeContextProvider = ({ children }) => {
   const [currentTheme, setCurrentTheme] = useState('light');
+  const [isSystemDark, setIsSystemDark] = useState(false);
 
-  const toggleTheme = (themeName) => {
-    setCurrentTheme(themeName);
+  // 模拟系统主题检测（实际应用中可以使用useColorScheme或其他方法）
+  useEffect(() => {
+    // 这里只是模拟，实际应用中应该使用React Native的useColorScheme钩子
+    // 或者Expo的Appearance.getColorScheme()
+    const checkSystemTheme = () => {
+      const hours = new Date().getHours();
+      // 简单模拟：晚上7点到早上7点为深色主题
+      setIsSystemDark(hours >= 19 || hours < 7);
+    };
+
+    // 初始检查
+    checkSystemTheme();
+
+    // 每小时检查一次
+    const interval = setInterval(checkSystemTheme, 3600000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const toggleTheme = () => {
+    setCurrentTheme(currentTheme === 'light' ? 'dark' : 'light');
   };
 
   const getTheme = () => {
+    if (currentTheme === 'auto') {
+      return isSystemDark ? themes.dark : themes.light;
+    }
     return themes[currentTheme];
   };
 
@@ -65,7 +88,14 @@ export const ThemeContextProvider = ({ children }) => {
   const theme = getTheme().colors;
 
   return (
-    <ThemeContext.Provider value={{ theme, getTheme, themes, currentTheme, toggleTheme }}>
+    <ThemeContext.Provider value={{
+      theme,
+      getTheme,
+      themes,
+      currentTheme,
+      toggleTheme,
+      themeName: currentTheme // 添加themeName属性以便在组件中使用
+    }}>
       {children}
     </ThemeContext.Provider>
   );
