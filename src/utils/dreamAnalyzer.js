@@ -127,6 +127,94 @@ const EMOTION_ANALYSIS = {
   }
 };
 
+// 情绪总结映射表
+const EMOTION_SUMMARY_MAP = {
+  positive: {
+    labels: ['开心', '希望', '大吉', '平和', '满足'],
+    suggestions: {
+      '开心': '保持这份愉悦，多做让自己快乐的事情',
+      '希望': '抓住机会，积极追求你的目标',
+      '大吉': '近期运势较好，适合尝试新事物',
+      '平和': '享受当前的平静，保持内心的安宁',
+      '满足': '珍惜所拥有的，感恩生活中的美好'
+    }
+  },
+  neutral: {
+    labels: ['平静', '思考', '观察', '等待', '探索'],
+    suggestions: {
+      '平静': '保持内心的平静，享受当下',
+      '思考': '给自己一些时间，深入思考内心的需求',
+      '观察': '留意身边的机会和变化',
+      '等待': '耐心等待，时机成熟时自然会有答案',
+      '探索': '保持好奇心，探索新的可能性'
+    }
+  },
+  negative: {
+    labels: ['焦虑', '压力', '困惑', '不安', '担忧'],
+    suggestions: {
+      '焦虑': '尝试放松技巧，如深呼吸或冥想，缓解焦虑情绪',
+      '压力': '适当减轻负担，优先处理重要的事情',
+      '困惑': '梳理思路，分解问题，逐步解决',
+      '不安': '关注内心的感受，寻找不安的根源',
+      '担忧': '采取积极行动，减少不确定性带来的担忧'
+    }
+  }
+};
+
+/**
+ * 生成情绪总结
+ * @param {Object} analysisResult - 梦境分析结果
+ * @returns {Object} 情绪总结对象
+ */
+const generateEmotionSummary = (analysisResult) => {
+  const { symbols, emotions, themes } = analysisResult;
+  
+  // 计算情绪倾向分数
+  let emotionScore = 0;
+  
+  // 基于情绪分析调整分数
+  emotions.forEach(emotionItem => {
+    if (emotionItem.analysis.intensity === '积极') {
+      emotionScore += 2;
+    } else if (emotionItem.analysis.intensity === '消极') {
+      emotionScore -= 2;
+    }
+  });
+  
+  // 基于象征意义调整分数
+  symbols.forEach(symbol => {
+    if (symbol.meanings.positive) {
+      emotionScore += 1;
+    }
+    if (symbol.meanings.negative) {
+      emotionScore -= 1;
+    }
+  });
+  
+  // 确定情绪类别
+  let emotionCategory;
+  if (emotionScore > 1) {
+    emotionCategory = 'positive';
+  } else if (emotionScore < -1) {
+    emotionCategory = 'negative';
+  } else {
+    emotionCategory = 'neutral';
+  }
+  
+  // 随机选择一个情绪标签（可以根据更复杂的逻辑调整）
+  const labels = EMOTION_SUMMARY_MAP[emotionCategory].labels;
+  const randomLabel = labels[Math.floor(Math.random() * labels.length)];
+  
+  // 获取对应的建议
+  const suggestion = EMOTION_SUMMARY_MAP[emotionCategory].suggestions[randomLabel];
+  
+  return {
+    label: randomLabel,
+    category: emotionCategory,
+    suggestion
+  };
+};
+
 // 梦境类型分类
 const DREAM_TYPES = {
   '噩梦': {
@@ -214,81 +302,56 @@ export const analyzeDreamElements = (content) => {
 };
 
 /**
- * 生成科学且有说服力的梦境解析报告
+ * 生成科学且精简的梦境解析报告
  * @param {string} content - 梦境描述内容
- * @returns {Object} 包含详细解析报告的对象
+ * @returns {Object} 包含精简解析报告的对象
  */
 export const generateScientificInterpretation = (content) => {
   const analysis = analyzeDreamElements(content);
+  
+  // 生成情绪总结
+  const emotionSummary = generateEmotionSummary(analysis);
 
-  // 构建专业解析报告
+  // 构建精简解析报告
   let report = '';
+  
+  // 情绪总结
+  report += '【情绪总结】\n';
+  report += `${emotionSummary.label}：${emotionSummary.suggestion}\n\n`;
 
-  // 引言部分
-  report += '【专业梦境解析报告】\n\n';
-  report += '基于现代心理学和符号学理论，结合您的梦境描述，我们进行了深入分析：\n\n';
-
-  // 符号分析
+  // 核心符号象征
   if (analysis.symbols.length > 0) {
-    report += '一、核心象征解析\n';
-    analysis.symbols.forEach((symbol, index) => {
-      report += `${index + 1}. ${symbol.type}象征"${symbol.symbol}"：\n`;
-      report += `   积极意义：${symbol.meanings.positive}\n`;
-      report += `   潜在警示：${symbol.meanings.negative}\n`;
-      report += `   心理学解读：${symbol.meanings.psychological}\n\n`;
+    report += '【核心符号象征】\n';
+    // 只显示前2个关键意象
+    const keySymbols = analysis.symbols.slice(0, 2);
+    keySymbols.forEach((symbol, index) => {
+      report += `${symbol.symbol}：${symbol.meanings.psychological}\n`;
     });
+    report += '\n';
   }
 
-  // 情绪分析
+  // 潜在情绪主题
   if (analysis.emotions.length > 0) {
-    report += '二、情绪状态评估\n';
+    report += '【潜在情绪主题】\n';
     analysis.emotions.forEach((emotionItem, index) => {
-      report += `${index + 1}. 情绪"${emotionItem.emotion}"：\n`;
-      report += `   强度等级：${emotionItem.analysis.intensity}\n`;
-      report += `   心理学意义：${emotionItem.analysis.psychological}\n`;
-      report += `   应对建议：${emotionItem.analysis.suggestion}\n\n`;
+      report += `${emotionItem.emotion}：${emotionItem.analysis.psychological}\n`;
     });
+    report += '\n';
   }
-
-  // 综合分析
-  report += '三、综合心理学洞察\n';
-  if (analysis.symbols.length > 0 || analysis.emotions.length > 0) {
-    report += '您的梦境反映出丰富的内在心理活动。';
-
-    // 根据符号数量判断梦境复杂度
-    if (analysis.symbols.length >= 3) {
-      report += '梦境中出现多个象征元素，表明您的潜意识正在积极处理复杂的信息和情感。';
-    } else if (analysis.symbols.length >= 1) {
-      report += '梦境中的核心象征指向您当前关注的重要议题。';
-    }
-
-    // 根据情绪判断心理状态
-    const negativeEmotions = analysis.emotions.filter(e => e.analysis.intensity === '消极');
-    if (negativeEmotions.length > 0) {
-      report += '负面情绪的存在提示您可能正面临一定的心理压力，建议适当关注情绪调节。';
-    } else if (analysis.emotions.length > 0) {
-      report += '情绪表达丰富，说明您具有良好的情感感知能力。';
-    }
-  } else {
-    report += '这是一个较为抽象的梦境，可能反映了您潜意识中难以名状的感受或思考。';
-  }
-
-  report += '\n';
 
   // 个性化建议
-  report += '四、个性化发展建议\n';
-  report += '1. 自我反思：请回顾近期生活中的重要事件，寻找与梦境的潜在联系\n';
-  report += '2. 情绪管理：通过冥想、运动等方式维护心理健康\n';
-  report += '3. 创意启发：梦境中的象征可能为创作或解决问题提供灵感\n';
-  report += '4. 持续记录：建立规律的梦境记录习惯，有助于深入了解自我\n';
+  report += '【自我探索建议】\n';
+  report += '回顾近期生活中的重要事件，寻找与梦境的潜在联系\n\n';
 
-  // 总结
-  report += '\n五、总结\n';
-  report += '梦境是通往潜意识的皇家大道。通过科学的方法解析梦境，可以帮助我们更好地认识自己，促进个人成长。本分析仅供参考，如需深入的心理咨询，请寻求专业心理医生的帮助。\n';
+  // 结尾安抚引导
+  report += '【助眠提示】\n';
+  report += '睡前可轻呼一口气，让梦境的启示伴随安稳入睡\n';
 
   return {
     report,
-    elements: analysis
+    elements: analysis,
+    emotionSummary: emotionSummary.label,
+    emotionSuggestion: emotionSummary.suggestion
   };
 };
 

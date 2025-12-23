@@ -49,13 +49,14 @@ const DEEPSEEK_API_CONFIG = {
 
 // 助眠App专属梦境解析专家提示词
 const DREAM_ANALYZER_PROMPT = `你是助眠 App 专属梦境解析专家，需基于心理学（荣格分析、符号学）逻辑，为用户提供专业且精简的解读，全程遵循以下要求：
-1. 解读聚焦 3 个核心维度：
+1. 解读必须包含【情绪总结】：使用简洁的标签（如：开心、焦虑、希望、大吉、平和、压力等）概括梦境的核心情绪，并给出1条对应建议
+2. 解读聚焦 3 个核心维度：
    - 核心符号象征（1-2 个关键意象，不罗列多个含义）
    - 潜在情绪主题（贴合用户状态，不用专业术语堆砌）
    - 轻量自我探索建议（1 条具体可操作，适配助眠场景）
-2. 语言精简（总字数≤200 字），语气温和舒缓，避免绝对化表述（用 "可能""或许""倾向于"）
-3. 不涉及恐怖、焦虑放大的解读
-4. 结尾呼应助眠需求，给出简短安抚引导（如：睡前可轻呼一口气，让梦境的启示伴随安稳入睡）`;
+3. 语言精简（总字数≤200 字），语气温和舒缓，避免绝对化表述（用 "可能""或许""倾向于"）
+4. 不涉及恐怖、焦虑放大的解读
+5. 结尾呼应助眠需求，给出简短安抚引导（如：睡前可轻呼一口气，让梦境的启示伴随安稳入睡）`;
 
 // 调用MIMO API进行梦境分析
 const analyzeDreamWithMIMO = async (dreamContent) => {
@@ -105,122 +106,7 @@ const analyzeDreamWithMIMO = async (dreamContent) => {
   }
 };
 
-// 调用DeepSeek API进行梦境分析（修改提示词）
-const analyzeDreamWithDeepSeek = async (dreamContent) => {
-  try {
-    if (!canUseDeepSeekApi()) {
-      throw new Error('今日API调用次数已达上限');
-    }
 
-    const response = await fetch(DEEPSEEK_API_CONFIG.baseUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${DEEPSEEK_API_CONFIG.apiKey}`
-      },
-      body: JSON.stringify({
-        model: DEEPSEEK_API_CONFIG.model,
-        messages: [
-          {
-            role: 'system',
-            content: DREAM_ANALYZER_PROMPT
-          },
-          {
-            role: 'user',
-            content: `请分析以下梦境内容：\n\n${dreamContent}`
-          }
-        ],
-        max_tokens: DEEPSEEK_API_CONFIG.maxTokens,
-        temperature: DEEPSEEK_API_CONFIG.temperature
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`API请求失败: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const analysisResult = data.choices[0]?.message?.content;
-
-    if (!analysisResult) {
-      throw new Error('API返回结果为空');
-    }
-
-    // 更新API使用计数
-    await updateApiUsage();
-
-    return {
-      analysisMethod: 'deepseek',
-      scientificReport: analysisResult,
-      dreamType: classifyDreamType(dreamContent)
-    };
-  } catch (error) {
-    console.error('DeepSeek API分析失败:', error);
-    throw error;
-  }
-};
-
-// 科学分析梦境（修改为优先使用MIMO模型）
-const scientificallyAnalyzeDream = async (id) => {
-  try {
-    const entry = getDreamEntryById(id);
-    if (!entry) {
-      throw new Error('梦境条目不存在');
-    }
-
-    let analysisResult;
-    let analysisMethod = 'local';
-
-    // 优先尝试MIMO API
-    try {
-      analysisResult = await analyzeDreamWithMIMO(entry.content);
-      analysisMethod = 'mimo';
-    } catch (mimoError) {
-      console.log('MIMO API分析失败，尝试使用DeepSeek API:', mimoError.message);
-      // MIMO失败，尝试DeepSeek
-      try {
-        if (canUseDeepSeekApi()) {
-          analysisResult = await analyzeDreamWithDeepSeek(entry.content);
-          analysisMethod = 'deepseek';
-        } else {
-          throw new Error('DeepSeek API调用次数已达上限');
-        }
-      } catch (deepseekError) {
-        console.log('DeepSeek API分析失败，使用本地分析:', deepseekError.message);
-        // DeepSeek也失败，使用本地分析
-        analysisResult = analyzeDreamLocally(entry.content);
-        analysisMethod = 'local';
-      }
-    }
-
-    const updatedEntry = {
-      ...entry,
-      ...analysisResult,
-      analysisMethod,
-      updatedAt: new Date().toISOString()
-    };
-
-    const updatedEntries = dreamEntries.map(e => e.id === id ? updatedEntry : e);
-    setDreamEntries(updatedEntries);
-    await saveDreamEntries(updatedEntries);
-
-    // 显示分析来源信息
-    if (analysisMethod === 'mimo') {
-      Alert.alert('分析完成', '使用MIMO AI分析');
-    } else if (analysisMethod === 'deepseek') {
-      Alert.alert('分析完成', `使用DeepSeek AI分析（今日剩余次数: ${99 - apiUsage.count}）`);
-    } else {
-      Alert.alert('分析完成', '使用本地规则库分析');
-    }
-
-    return updatedEntry;
-  } catch (err) {
-    console.error('科学解析梦境失败:', err);
-    setError('科学解析梦境失败');
-    Alert.alert('分析失败', '梦境分析失败，请稍后重试');
-    return false;
-  }
-};
 
 // 默认梦境条目结构
 const createDefaultDreamEntry = (title = '', content = '', tags = []) => ({
@@ -350,21 +236,23 @@ export const DreamJournalContextProvider = ({ children }) => {
           messages: [
             {
               role: 'system',
-              content: `你是一个专业的梦境分析师，基于心理学和符号学理论分析梦境。请对用户提供的梦境内容进行专业分析，包括：
-              1. 梦境类型分类
-              2. 主要象征意义解析
-              3. 情绪状态评估
-              4. 心理学洞察
-              5. 个性化建议
-
-              请用中文回复，格式清晰专业。`
+              content: `你是助眠 App 专属梦境解析专家，需基于心理学（荣格分析、符号学）逻辑，为用户提供专业且精简的解读，全程遵循以下要求：
+1. 解读必须包含【情绪总结】：使用简洁的标签（如：开心、焦虑、希望、大吉、平和、压力等）概括梦境的核心情绪，并给出1条对应建议
+2. 解读聚焦 3 个核心维度：
+   - 核心符号象征（1-2 个关键意象，不罗列多个含义）
+   - 潜在情绪主题（贴合用户状态，不用专业术语堆砌）
+   - 轻量自我探索建议（1 条具体可操作，适配助眠场景）
+3. 语言精简（总字数≤200 字），语气温和舒缓，避免绝对化表述（用 "可能""或许""倾向于"）
+4. 不涉及恐怖、焦虑放大的解读
+5. 结尾呼应助眠需求，给出简短安抚引导（如：睡前可轻呼一口气，让梦境的启示伴随安稳入睡）
+6. 格式清晰，使用简洁的标题或分点，避免冗长段落`
             },
             {
               role: 'user',
               content: `请分析以下梦境内容：\n\n${dreamContent}`
             }
           ],
-          max_tokens: DEEPSEEK_API_CONFIG.maxTokens,
+          max_tokens: 500,
           temperature: DEEPSEEK_API_CONFIG.temperature
         })
       });
@@ -406,7 +294,7 @@ export const DreamJournalContextProvider = ({ children }) => {
     };
   };
 
-  // 科学分析梦境（优先使用DeepSeek API，失败时使用本地分析）
+  // 科学分析梦境（优先使用MIMO API，失败时使用DeepSeek API，最后使用本地分析）
   const scientificallyAnalyzeDream = async (id) => {
     try {
       const entry = getDreamEntryById(id);
@@ -417,18 +305,26 @@ export const DreamJournalContextProvider = ({ children }) => {
       let analysisResult;
       let analysisMethod = 'local';
 
-      // 优先尝试DeepSeek API
+      // 优先尝试MIMO API
       try {
-        if (canUseDeepSeekApi()) {
-          analysisResult = await analyzeDreamWithDeepSeek(entry.content);
-          analysisMethod = 'deepseek';
-        } else {
-          throw new Error('API调用次数已达上限');
+        analysisResult = await analyzeDreamWithMIMO(entry.content);
+        analysisMethod = 'mimo';
+      } catch (mimoError) {
+        console.log('MIMO API分析失败，尝试DeepSeek API:', mimoError.message);
+        // MIMO API失败，尝试DeepSeek API
+        try {
+          if (canUseDeepSeekApi()) {
+            analysisResult = await analyzeDreamWithDeepSeek(entry.content);
+            analysisMethod = 'deepseek';
+          } else {
+            throw new Error('DeepSeek API调用次数已达上限');
+          }
+        } catch (deepseekError) {
+          console.log('DeepSeek API分析失败，使用本地分析:', deepseekError.message);
+          // 所有API都失败，使用本地分析
+          analysisResult = analyzeDreamLocally(entry.content);
+          analysisMethod = 'local';
         }
-      } catch (apiError) {
-        console.log('DeepSeek API分析失败，使用本地分析:', apiError.message);
-        analysisResult = analyzeDreamLocally(entry.content);
-        analysisMethod = 'local';
       }
 
       const updatedEntry = {
@@ -443,10 +339,12 @@ export const DreamJournalContextProvider = ({ children }) => {
       await saveDreamEntries(updatedEntries);
 
       // 显示分析来源信息
-      if (analysisMethod === 'deepseek') {
+      if (analysisMethod === 'mimo') {
+        Alert.alert('分析完成', '使用MIMO AI分析');
+      } else if (analysisMethod === 'deepseek') {
         Alert.alert('分析完成', `使用DeepSeek AI分析（今日剩余次数: ${99 - apiUsage.count}）`);
       } else {
-        Alert.alert('分析完成', '使用本地规则库分析（API调用次数已达上限）');
+        Alert.alert('分析完成', '使用本地规则库分析（API调用失败）');
       }
 
       return updatedEntry;

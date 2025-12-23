@@ -7,7 +7,7 @@ import { useDreamJournalContext } from '../context/DreamJournalContext';
 import StatisticsCard from '../components/StatisticsCard';
 import StatsOverview from '../components/StatsOverview';
 
-const StatisticsScreen = ({ navigation, route }) => {
+const StatisticsScreen = ({ route }) => {
   const { theme } = useThemeContext();
   const [activeTab, setActiveTab] = useState('overview');
   
@@ -66,7 +66,7 @@ const StatisticsScreen = ({ navigation, route }) => {
   );
 
   const handleBackToHome = () => {
-    navigation.navigate('MainTabs');
+    route?.params?.navigation?.navigate('Home');
   };
 
   return (
@@ -76,12 +76,12 @@ const StatisticsScreen = ({ navigation, route }) => {
         style={[styles.backButton, { backgroundColor: theme.card }]} 
         onPress={handleBackToHome}
       >
-          <Ionicons name="home-outline" size={24} color={theme.text} />
+        <Ionicons name="home-outline" size={24} color={theme.text} />
         <Text style={[styles.backButtonText, { color: theme.text }]}>返回主页</Text>
       </TouchableOpacity>
       
       {renderTabButtons()}
-      {activeTab === 'overview' && <StatsOverview navigation={navigation} />}
+      {activeTab === 'overview' && <StatsOverview navigation={route?.params?.navigation} />}
       {activeTab === 'sleep' && <SleepDetails />}
       {activeTab === 'dreams' && <DreamDetails />}
     </View>
