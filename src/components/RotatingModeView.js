@@ -225,19 +225,34 @@ const RotatingModeView = ({ menuItems, theme, navigation, rotationDirection, tog
                 scrollEnabled={Platform.OS === 'web' ? true : false}
                 {...panResponder.panHandlers}
             >
-                {duplicatedItems.map((item, index) => (
-                    <View key={`${item.id}-${index}`} style={{ width: cellWidth, height: 280, justifyContent: 'center', alignItems: 'center' }}>
-                        <MenuCard
-                            ref={ref => menuCardRefs.current[index] = ref}
-                            item={item}
-                            onPress={() => navigation.navigate(item.screen)}
-                            style={{ width: cardWidth, height: '100%', paddingVertical: 10 }}
-                            scrollX={scrollX}
-                            index={index}
-                            cardWidth={cardWidth}
-                        />
-                    </View>
-                ))}
+                {duplicatedItems.map((item, index) => {
+                    const inputRange = [
+                        (index - 1) * cellWidth,
+                        index * cellWidth,
+                        (index + 1) * cellWidth
+                    ];
+                    const scale = scrollX.interpolate({
+                        inputRange,
+                        outputRange: [0.95, 1.08, 0.95],
+                        extrapolate: 'clamp'
+                    });
+                    return (
+                        <Animated.View 
+                            key={`${item.id}-${index}`} 
+                            style={{ width: cellWidth, height: 280, justifyContent: 'center', alignItems: 'center', transform: [{ scale }] }}
+                        >
+                            <MenuCard
+                                ref={ref => menuCardRefs.current[index] = ref}
+                                item={item}
+                                onPress={() => navigation.navigate(item.screen)}
+                                style={{ width: cardWidth, height: '100%', paddingVertical: 10 }}
+                                scrollX={scrollX}
+                                index={index}
+                                cardWidth={cardWidth}
+                            />
+                        </Animated.View>
+                    );
+                })}
             </Animated.ScrollView>
             
             <View style={styles.controlsContainer}>
@@ -269,9 +284,11 @@ const RotatingModeView = ({ menuItems, theme, navigation, rotationDirection, tog
 
 const styles = StyleSheet.create({
     rotatingModeContainer: { 
-        height: 380, // 调整高度适应新布局
-        justifyContent: 'center', 
+        height: 420, 
+        justifyContent: 'flex-start', 
         alignItems: 'center',
+        paddingTop: 8,
+        paddingBottom: 32,
         marginVertical: 20
     },
     rotatingScrollView: { flexGrow: 0, width: '100%' },
@@ -279,9 +296,9 @@ const styles = StyleSheet.create({
         flexDirection: 'row', 
         alignItems: 'center', 
         justifyContent: 'space-between', 
-        width: '85%', 
-        position: 'absolute', 
-        bottom: 0, 
+        width: '90%', 
+        alignSelf: 'center',
+        marginTop: 16,
         paddingHorizontal: 15, 
         paddingVertical: 8,
         backgroundColor: 'rgba(0,0,0,0.4)', 

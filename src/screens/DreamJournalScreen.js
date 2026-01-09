@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Modal, TextInput, Button, Alert, ScrollView, Ac
 import { useThemeContext } from '../context/ThemeContext';
 import { useDreamJournalContext } from '../context/DreamJournalContext';
 import CuteDreamAnimations from '../components/CuteDreamAnimations';
+import MoleculeLoading from '../components/MoleculeLoading';
 import DreamEntryCard from '../components/DreamEntryCard'; // 1. 导入新的动画卡片组件
 
 const animationAssets = {
@@ -198,7 +199,7 @@ const DreamJournalScreen = () => {
               <Text style={[styles.modalTitle, {color: theme.text}]}>科学解析</Text>
               {isAnalyzing ? (
                 <View style={styles.analysisLoadingContainer}>
-                  <CuteDreamAnimations isVisible={true} source={animationAssets.butterfly.source} description={animationAssets.butterfly.description}/>
+                  <MoleculeLoading width={200} height={200} />
                   <Text style={[styles.loadingText, {color: theme.text}]}>正在解析梦境...</Text>
                 </View>
               ) : (
