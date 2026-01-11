@@ -14,26 +14,26 @@ export const ModeContextProvider = ({ children }) => {
   const [currentMode, setCurrentMode] = useState(MODE_TRADITIONAL);
   const [rotationDirection, setRotationDirection] = useState(ROTATION_DIRECTION_CLOCKWISE);
   const [customMenuItems, setCustomMenuItems] = useState([
-    { id: 'timer', title: '睡眠定时器', description: '设置睡眠提醒时间', icon: '⏰', screen: 'SleepTimer', visible: true },
-    { id: 'sound', title: '音效库', description: '选择助眠音效', icon: '🎵', screen: 'SoundLibrary', visible: true },
-    { id: 'statistics', title: '统计数据', description: '查看睡眠统计', icon: '📊', screen: 'Statistics', visible: true },
-    { id: 'visual', title: '视觉辅助', description: '助眠视觉效果', icon: '🌈', screen: 'VisualAid', visible: true },
-    { id: 'dream', title: '梦境日志', description: '记录梦境', icon: '📝', screen: 'DreamJournal', visible: true },
-    { id: 'community', title: '社区', description: '加入睡眠社区', icon: '👥', screen: 'Community', visible: true },
-    { id: 'profile', title: '个人资料', description: '管理个人信息', icon: '👤', screen: 'Profile', visible: true },
-    { id: 'settings', title: '设置', description: '调整应用设置', icon: '⚙️', screen: 'Settings', visible: true },
-    { id: 'feedback', title: '反馈意见', description: '向我们反馈您的建议', icon: '💬', screen: 'Feedback', visible: true },
+    { id: 'timer', title: '睡眠定时器', description: '设置睡眠提醒时间', icon: 'alarm-outline', screen: 'SleepTimer', visible: true },
+    { id: 'sound', title: '聆听', description: '纯净音效与有声读物', icon: 'musical-notes-outline', screen: 'ListeningHub', visible: true },
+    // 1. 更新 screen 属性
+    { id: 'statistics', title: '统计数据', description: '查看睡眠和梦境统计', icon: 'bar-chart-outline', screen: 'Statistics', visible: true },
+    { id: 'visual', title: '视觉辅助', description: '助眠视觉效果', icon: 'color-palette-outline', screen: 'VisualAid', visible: true },
+    { id: 'dream', title: '梦境空间', description: '记录、分析并探索你的梦境世界', icon: 'book-outline', screen: 'DreamJournal', visible: true },
+    { id: 'community', title: '社区', description: '加入睡眠社区', icon: 'people-outline', screen: 'Community', visible: true },
+    { id: 'profile', title: '个人资料', description: '管理个人信息', icon: 'person-circle-outline', screen: 'Profile', visible: true },
+    { id: 'settings', title: '设置', description: '调整应用设置', icon: 'settings-outline', screen: 'Settings', visible: true },
+    { id: 'feedback', title: '反馈意见', description: '通过邮箱或微信联系我们', icon: 'chatbubble-ellipses-outline', screen: 'Feedback', visible: true },
   ]);
   const [hiddenMenuItems, setHiddenMenuItems] = useState([]);
   const [selectedCard, setSelectedCard] = useState(null);
 
-  // 切换模式
+  // ... (rest of the context functions remain the same)
   const toggleMode = (mode) => {
     setCurrentMode(mode);
-    setSelectedCard(null); // 切换模式时重置选中卡片
+    setSelectedCard(null); 
   };
 
-  // 切换旋转方向
   const toggleRotationDirection = () => {
     setRotationDirection(prev => 
       prev === ROTATION_DIRECTION_CLOCKWISE 
@@ -42,32 +42,24 @@ export const ModeContextProvider = ({ children }) => {
     );
   };
 
-  // 切换卡片可见性
-  const toggleCardVisibility = (cardId) => {
-    // 确保设置卡片不能被删除
-    if (cardId === 'settings') {
-      return;
-    }
-    
-    setCustomMenuItems(prev => {
-      const updatedItems = prev.map(item => {
-        if (item.id === cardId) {
-          const newItem = { ...item, visible: !item.visible };
-          if (!newItem.visible) {
-            setHiddenMenuItems(prevHidden => [...prevHidden, newItem]);
-          }
-          return newItem;
-        }
-        return item;
-      });
-      return updatedItems.filter(item => item.visible);
-    });
-    
-    // 从隐藏列表中移除如果重新显示
-    setHiddenMenuItems(prev => prev.filter(item => item.id !== cardId));
-  };
+   const toggleCardVisibility = (cardId) => {
+     if (cardId === 'settings') return;
+     const currentCard = customMenuItems.find(item => item.id === cardId);
+     if (currentCard) {
+       if (currentCard.visible) {
+         setCustomMenuItems(prev => prev.map(item =>
+           item.id === cardId ? { ...item, visible: false } : item
+         ));
+         setHiddenMenuItems(prev => [...prev, { ...currentCard, visible: false }]);
+       } else {
+         setCustomMenuItems(prev => prev.map(item =>
+           item.id === cardId ? { ...item, visible: true } : item
+         ));
+         setHiddenMenuItems(prev => prev.filter(item => item.id !== cardId));
+       }
+     }
+   };
 
-  // 将隐藏卡片移回自定义列表
   const restoreHiddenCard = (cardId) => {
     setHiddenMenuItems(prev => {
       const cardToRestore = prev.find(item => item.id === cardId);
@@ -78,7 +70,6 @@ export const ModeContextProvider = ({ children }) => {
     });
   };
 
-  // 重新排序卡片
   const reorderCards = (startIndex, endIndex) => {
     setCustomMenuItems(prev => {
       const result = Array.from(prev);
@@ -88,7 +79,15 @@ export const ModeContextProvider = ({ children }) => {
     });
   };
 
-  // 设置选中卡片（用于抓牌模式）
+  const pinCard = (index) => {
+    setCustomMenuItems(prev => {
+      const result = Array.from(prev);
+      const [removed] = result.splice(index, 1);
+      result.unshift(removed);
+      return result;
+    });
+  };
+
   const setSelectedCardId = (cardId) => {
     setSelectedCard(cardId);
   };
@@ -106,6 +105,7 @@ export const ModeContextProvider = ({ children }) => {
         toggleCardVisibility,
         restoreHiddenCard,
         reorderCards,
+        pinCard,
         setSelectedCardId,
         modes: {
           traditional: MODE_TRADITIONAL,

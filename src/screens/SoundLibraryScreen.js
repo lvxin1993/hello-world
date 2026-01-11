@@ -1,222 +1,135 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { useThemeContext } from '../context/ThemeContext';
 import { Audio } from 'expo-av';
+import { Ionicons } from '@expo/vector-icons';
+import { useSleepContext } from '../context/SleepContext'; // 1. 导入 SleepContext
 
-const SoundLibraryScreen = () => {
+const soundList = [
+  { id: '1', title: '雨声', category: '自然', thumbnail: '🌧️', file: require('../../assets/sounds/rain.mp3') },
+  { id: '2', title: '海浪声', category: '自然', thumbnail: '🌊', file: require('../../assets/sounds/ocean.mp3') },
+  { id: '3', title: '风声', category: '自然', thumbnail: '💨', file: require('../../assets/sounds/wind.mp3') },
+  { id: '4', title: '鸟鸣', category: '自然', thumbnail: '🐦', file: require('../../assets/sounds/birds.mp3') },
+  { id: '5', title: '冥想音乐', category: '音乐', thumbnail: '🧘', file: require('../../assets/sounds/meditation.mp3') },
+  { id: '6', title: '白噪音', category: '其他', thumbnail: '🎵', file: require('../../assets/sounds/whitenoise.mp3') },
+];
+
+const SoundRow = ({ sound, theme, onPress, isPlaying }) => (
+  <View style={[styles.row, { backgroundColor: theme.card }]}>
+    <View style={styles.thumbnailContainer}><Text style={styles.thumbnail}>{sound.thumbnail}</Text></View>
+    <View style={styles.infoContainer}>
+      <Text style={[styles.title, { color: theme.text }]}>{sound.title}</Text>
+      <Text style={[styles.category, { color: theme.textSecondary }]}>{sound.category}</Text>
+    </View>
+    <TouchableOpacity onPress={() => onPress(sound)} style={styles.playButton}>
+      <Ionicons name={isPlaying ? 'pause-circle' : 'play-circle'} size={40} color={theme.primary} />
+    </TouchableOpacity>
+  </View>
+);
+
+const SoundLibraryScreen = ({ navigation }) => {
   const { theme } = useThemeContext();
-  const [playingSound, setPlayingSound] = useState(null);
-  const [soundInstance, setSoundInstance] = useState(null);
+  const { onAudioShouldStop, audioStopRemainingTime } = useSleepContext(); // 2. 获取事件和状态
+  const soundObject = useRef(null);
+  const [currentPlayingId, setCurrentPlayingId] = useState(null);
 
-  // 声音列表
-  const sounds = [
-    {
-      id: 1,
-      title: '雨声',
-      category: '自然声音',
-      isVip: false,
-      duration: '1小时',
-      thumbnail: '🌧️',
-      soundFile: require('../../assets/sounds/rain.mp3'),
-    },
-    {
-      id: 2,
-      title: '海浪声',
-      category: '自然声音',
-      isVip: false,
-      duration: '1小时',
-      thumbnail: '🌊',
-      soundFile: require('../../assets/sounds/ocean.mp3'),
-    },
-    {
-      id: 3,
-      title: '鸟鸣声',
-      category: '自然声音',
-      isVip: false,
-      duration: '30分钟',
-      thumbnail: '🐦',
-      soundFile: require('../../assets/sounds/birds.mp3'),
-    },
-    {
-      id: 4,
-      title: '风声',
-      category: '自然声音',
-      isVip: false,
-      duration: '1小时',
-      thumbnail: '🍃',
-      soundFile: require('../../assets/sounds/wind.mp3'),
-    },
-    {
-      id: 5,
-      title: '白噪音',
-      category: '白噪音',
-      isVip: false,
-      duration: '无限',
-      thumbnail: '🔊',
-      soundFile: require('../../assets/sounds/whitenoise.mp3'),
-    },
-    {
-      id: 6,
-      title: '冥想音乐',
-      category: '冥想',
-      isVip: true,
-      duration: '45分钟',
-      thumbnail: '🧘',
-      soundFile: require('../../assets/sounds/meditation.mp3'),
-    },
-  ];
-
-  // 播放/暂停声音
-  const toggleSound = async (sound) => {
-    if (playingSound === sound.id) {
-      // 暂停当前播放的声音
-      if (soundInstance) {
-        await soundInstance.pauseAsync();
-        setPlayingSound(null);
-      }
-    } else {
-      // 停止当前播放的声音
-      if (soundInstance) {
-        await soundInstance.stopAsync();
-        await soundInstance.unloadAsync();
-      }
-
-      // 播放新声音
-      try {
-        const { sound: newSoundInstance } = await Audio.Sound.createAsync(
-          sound.soundFile,
-          { shouldPlay: true, isLooping: true }
-        );
-        setSoundInstance(newSoundInstance);
-        setPlayingSound(sound.id);
-
-        // 监听声音播放完成
-        newSoundInstance.setOnPlaybackStatusUpdate((status) => {
-          if (status.isLoaded && !status.isPlaying && status.didJustFinish) {
-            setPlayingSound(null);
-            setSoundInstance(null);
-          }
-        });
-      } catch (error) {
-        console.error('播放声音失败:', error);
-      }
+  const cleanupSound = useCallback(async () => {
+    if (soundObject.current) {
+      await soundObject.current.stopAsync();
+      await soundObject.current.unloadAsync();
+      soundObject.current = null;
+      setCurrentPlayingId(null);
     }
-  };
+  }, []);
 
-  // 组件卸载时停止声音
-  React.useEffect(() => {
-    return () => {
-      if (soundInstance) {
-        soundInstance.unloadAsync();
+  // 3. 注册并监听全局停止事件
+  useEffect(() => {
+    const unsubscribe = onAudioShouldStop(cleanupSound);
+    return unsubscribe;
+  }, [cleanupSound, onAudioShouldStop]);
+
+  const handleSoundPress = useCallback(async (selectedSound) => {
+    try {
+      if (currentPlayingId === selectedSound.id) {
+        await cleanupSound();
+        return;
       }
-    };
-  }, [soundInstance]);
+
+      await cleanupSound(); // Stop any currently playing sound first
+
+      const { sound } = await Audio.Sound.createAsync(
+        selectedSound.file,
+        { shouldPlay: true, isLooping: true }
+      );
+      soundObject.current = sound;
+      setCurrentPlayingId(selectedSound.id);
+
+    } catch (error) {
+      console.error('播放声音出错:', error);
+      await cleanupSound();
+    }
+  }, [currentPlayingId, cleanupSound]);
+
+  useEffect(() => {
+    return () => cleanupSound(); // Final cleanup on unmount
+  }, [cleanupSound]);
+  
+  const formatTime = (seconds) => {
+      if (!seconds || seconds <= 0) return null;
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  }
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
-      <Text style={[styles.title, { color: theme.text }]}>助眠声音库</Text>
-      
-      <View style={styles.soundsContainer}>
-        {sounds.map((sound) => (
-          <TouchableOpacity
-            key={sound.id}
-            style={[styles.soundCard, { backgroundColor: theme.card }]}
-            onPress={() => toggleSound(sound)}
-          >
-            <View style={styles.soundThumbnail}>
-              <Text style={styles.thumbnailEmoji}>{sound.thumbnail}</Text>
-              {sound.isVip && (
-                <View style={styles.vipBadge}>
-                  <Text style={styles.vipBadgeText}>VIP</Text>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <View style={[styles.header, { borderBottomColor: theme.border + '50'}]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton}>
+          <Ionicons name="arrow-back" size={28} color={theme.text} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>纯净音效</Text>
+        {/* 4. 显示全局定时器状态 */}
+        <View style={styles.headerButton}>
+            {audioStopRemainingTime && (
+                <View style={{alignItems: 'center'}}>
+                    <Ionicons name="timer" size={24} color={theme.primary} />
+                    <Text style={[styles.timerText, {color: theme.primary}]}>{formatTime(audioStopRemainingTime)}</Text>
                 </View>
-              )}
-            </View>
-            <View style={styles.soundInfo}>
-              <Text style={[styles.soundTitle, { color: theme.text }]}>{sound.title}</Text>
-              <Text style={[styles.soundCategory, { color: theme.textSecondary }]}>{sound.category}</Text>
-              <Text style={[styles.soundDuration, { color: theme.textSecondary }]}>{sound.duration}</Text>
-            </View>
-            <View style={styles.playButton}>
-              <Text style={styles.playButtonEmoji}>
-                {playingSound === sound.id ? '⏸️' : '▶️'}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        ))}
+            )}
+        </View>
       </View>
-    </ScrollView>
+
+      <FlatList
+        data={soundList}
+        renderItem={({ item }) => (
+          <SoundRow 
+            sound={item} 
+            theme={theme} 
+            onPress={handleSoundPress}
+            isPlaying={currentPlayingId === item.id}
+          />
+        )}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listContainer}
+      />
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 20,
-  },
-  soundsContainer: {
-    gap: 15,
-  },
-  soundCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 15,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  soundThumbnail: {
-    position: 'relative',
-    marginRight: 15,
-  },
-  thumbnailEmoji: {
-    fontSize: 40,
-  },
-  vipBadge: {
-    position: 'absolute',
-    top: -5,
-    right: -5,
-    backgroundColor: '#FFD700',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-  },
-  vipBadgeText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#000000',
-  },
-  soundInfo: {
-    flex: 1,
-  },
-  soundTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 5,
-  },
-  soundCategory: {
-    fontSize: 14,
-    marginBottom: 3,
-  },
-  soundDuration: {
-    fontSize: 12,
-  },
-  playButton: {
-    padding: 10,
-  },
-  playButtonEmoji: {
-    fontSize: 30,
-  },
+  container: { flex: 1 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 50, paddingBottom: 15, paddingHorizontal: 16, borderBottomWidth: 1 },
+  headerTitle: { fontSize: 22, fontWeight: 'bold' },
+  headerButton: { padding: 5, minWidth: 60, alignItems: 'center' },
+  timerText: { fontSize: 10, fontWeight: 'bold', marginTop: 2 },
+  listContainer: { paddingTop: 20, paddingHorizontal: 16 },
+  row: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, padding: 12, marginBottom: 16, elevation: 2, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 4, shadowOffset: { width: 0, height: 1 } },
+  thumbnailContainer: { width: 60, height: 60, borderRadius: 8, backgroundColor: '#e9ecef', justifyContent: 'center', alignItems: 'center', marginRight: 16 },
+  thumbnail: { fontSize: 30 },
+  infoContainer: { flex: 1 },
+  title: { fontSize: 17, fontWeight: '500', marginBottom: 4 },
+  category: { fontSize: 13 },
+  playButton: { padding: 10 },
 });
 
 export default SoundLibraryScreen;

@@ -1,194 +1,293 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
-import * as Notifications from 'expo-notifications';
+import React, { createContext, useState, useContext, useEffect, useRef, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
 const SleepContext = createContext();
 
 export const SleepContextProvider = ({ children }) => {
-  const [sleepRecords, setSleepRecords] = useState([]);
-  const [timerDuration, setTimerDuration] = useState(30); // 默认30分钟
+  // --- Existing States for Sleep Alarm & Stats ---
+  const [timerMode, setTimerMode] = useState('interval');
+  const [timerDuration, setTimerDuration] = useState(30);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
-  const [remainingTime, setRemainingTime] = useState(30 * 60); // 秒
-  const [notificationPermission, setNotificationPermission] = useState(null);
-  const [alarmSound, setAlarmSound] = useState('default'); // 默认铃声
-  const [积分, set积分] = useState(0); // 用户积分
-  const [会员状态, setMembership] = useState('普通会员'); // 会员状态
+  const [remainingTime, setRemainingTime] = useState(30 * 60);
+  const [alarmSound, setAlarmSound] = useState('default');
+  const [targetTime, setTargetTime] = useState({ hour: 22, minute: 30 });
+  const [repeatMode, setRepeatMode] = useState('once');
+  const [sleepRecords, setSleepRecords] = useState([]);
 
-  // 配置通知处理
+  // --- 1. New States for Global Audio Stop Timer ---
+  const [audioStopTimerDuration, setAudioStopTimerDuration] = useState(null); // in minutes
+  const [audioStopRemainingTime, setAudioStopRemainingTime] = useState(null); // in seconds
+  const stopAudioCallbacks = useRef(new Set()).current; // Use a Set to store callbacks
+  const audioTimerRef = useRef(null); // Ref to hold the interval ID
+
+  // --- 2. New Timer Logic for Audio Stop ---
   useEffect(() => {
-    const configureNotifications = async () => {
-      // 在web平台上不配置通知
-      if (Platform.OS === 'web') {
-        setNotificationPermission('granted'); // web上模拟授权状态
-        return;
-      }
-      
-      // 请求通知权限
-      const { status: existingStatus } = await Notifications.getPermissionsAsync();
-      let finalStatus = existingStatus;
-      
-      if (existingStatus !== 'granted') {
-        const { status } = await Notifications.requestPermissionsAsync();
-        finalStatus = status;
-      }
-      setNotificationPermission(finalStatus);
-
-      if (finalStatus !== 'granted') {
-        alert('需要通知权限才能使用定时功能');
-        return;
-      }
-
-      // 配置通知处理
-      Notifications.setNotificationHandler({
-        handleNotification: async () => ({
-          shouldShowAlert: true,
-          shouldPlaySound: true,
-          shouldSetBadge: false,
-        }),
-      });
+    if (audioStopRemainingTime !== null && audioStopRemainingTime > 0) {
+      audioTimerRef.current = setInterval(() => {
+        setAudioStopRemainingTime(prev => {
+          if (prev <= 1) {
+            clearInterval(audioTimerRef.current);
+            console.log('Global Audio Stop Timer finished. Stopping all audio.');
+            stopAllAudio();
+            setAudioStopTimerDuration(null);
+            return null;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } 
+    return () => {
+      if (audioTimerRef.current) clearInterval(audioTimerRef.current);
     };
+  }, [audioStopRemainingTime]);
 
-    configureNotifications();
-  }, []);
+  // --- 3. New Functions for Global Audio Stop Timer ---
+  const startAudioStopTimer = (minutes) => {
+    console.log(`Starting global audio stop timer for ${minutes} minutes.`);
+    if (audioTimerRef.current) clearInterval(audioTimerRef.current);
+    setAudioStopTimerDuration(minutes);
+    setAudioStopRemainingTime(minutes * 60);
+  };
 
-  // 计时器逻辑
+  const cancelAudioStopTimer = () => {
+    console.log('Cancelling global audio stop timer.');
+    if (audioTimerRef.current) clearInterval(audioTimerRef.current);
+    setAudioStopTimerDuration(null);
+    setAudioStopRemainingTime(null);
+  };
+
+  const stopAllAudio = () => {
+    stopAudioCallbacks.forEach(callback => callback());
+  };
+
+  const onAudioShouldStop = useCallback((callback) => {
+    stopAudioCallbacks.add(callback);
+    return () => {
+      stopAudioCallbacks.delete(callback);
+    };
+  }, [stopAudioCallbacks]);
+
+
+  // --- Existing Logic ---
+  const calculateTargetDate = () => {
+    const now = new Date();
+    const target = new Date();
+    target.setHours(targetTime.hour, targetTime.minute, 0, 0);
+    
+    // If target time is earlier than current time, set it for next day
+    if (target <= now) {
+      target.setDate(target.getDate() + 1);
+    }
+    
+    return target;
+  };
+
+  const calculateRemainingTime = () => {
+    const target = calculateTargetDate();
+    const now = new Date();
+    const diff = target - now;
+    return Math.max(0, Math.floor(diff / 1000));
+  };
+
+  const setTimer = (duration) => {
+    setTimerDuration(duration);
+    setRemainingTime(duration * 60);
+  };
+
+  const updateTimerMode = (mode) => {
+    setTimerMode(mode);
+  };
+
+  const updateTimePoint = (time) => {
+    setTargetTime(time);
+  };
+
+  const updateRepeatMode = (mode) => {
+    setRepeatMode(mode);
+  };
+
+  const startTimer = () => {
+    setIsTimerRunning(true);
+    if (timerMode === 'interval') {
+      setRemainingTime(timerDuration * 60);
+    } else {
+      setRemainingTime(calculateRemainingTime());
+    }
+  };
+
+  const pauseTimer = () => {
+    setIsTimerRunning(false);
+  };
+
+  const resetTimer = () => {
+    setIsTimerRunning(false);
+    if (timerMode === 'interval') {
+      setRemainingTime(timerDuration * 60);
+    } else {
+      setRemainingTime(calculateRemainingTime());
+    }
+  };
+
+  const setAlarmSoundPreference = (sound) => {
+    setAlarmSound(sound);
+  };
+
+  const addSleepRecord = (record) => {
+    const newRecord = { ...record, id: Date.now().toString() };
+    setSleepRecords(prev => [...prev, newRecord]);
+    saveSleepRecordsToStorage([...sleepRecords, newRecord]);
+  };
+
+  const updateSleepRecord = (id, updates) => {
+    const updatedRecords = sleepRecords.map(record => 
+      record.id === id ? { ...record, ...updates } : record
+    );
+    setSleepRecords(updatedRecords);
+    saveSleepRecordsToStorage(updatedRecords);
+  };
+
+  const deleteSleepRecord = (id) => {
+    const updatedRecords = sleepRecords.filter(record => record.id !== id);
+    setSleepRecords(updatedRecords);
+    saveSleepRecordsToStorage(updatedRecords);
+  };
+
+  const calculateSleepStats = () => {
+    if (sleepRecords.length === 0) {
+      return {
+        averageSleepTime: 0,
+        totalSleepDays: 0,
+        thisWeekAverage: 0,
+        bestStreak: 0,
+        deepSleepPercentage: '85%',
+        totalSleepRecords: 0,
+        mostCommonBedtime: null,
+        sleepQuality: 0
+      };
+    }
+
+    const totalMinutes = sleepRecords.reduce((sum, record) => {
+      if (record.duration) return sum + record.duration;
+      return sum;
+    }, 0);
+
+    const averageMinutes = totalMinutes / sleepRecords.length;
+    const averageHours = averageMinutes / 60;
+
+    // Calculate this week's average
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    const thisWeekRecords = sleepRecords.filter(record => 
+      new Date(record.date || record.createdAt) >= oneWeekAgo
+    );
+    
+    const thisWeekMinutes = thisWeekRecords.reduce((sum, record) => {
+      if (record.duration) return sum + record.duration;
+      return sum;
+    }, 0);
+    const thisWeekAverage = thisWeekRecords.length > 0 ? (thisWeekMinutes / thisWeekRecords.length) / 60 : 0;
+
+    return {
+      averageSleepTime: averageHours,
+      totalSleepDays: sleepRecords.length,
+      thisWeekAverage: thisWeekAverage,
+      bestStreak: Math.min(sleepRecords.length, 7), // Placeholder
+      deepSleepPercentage: '85%', // Placeholder
+      totalSleepRecords: sleepRecords.length,
+      mostCommonBedtime: targetTime,
+      sleepQuality: 75 // Placeholder calculation
+    };
+  };
+
+  const saveSleepRecordsToStorage = async (records) => {
+    try {
+      await AsyncStorage.setItem('sleepRecords', JSON.stringify(records));
+    } catch (error) {
+      console.error('Error saving sleep records:', error);
+    }
+  };
+
+  const loadSleepRecordsFromStorage = async () => {
+    try {
+      const stored = await AsyncStorage.getItem('sleepRecords');
+      if (stored) {
+        setSleepRecords(JSON.parse(stored));
+      }
+    } catch (error) {
+      console.error('Error loading sleep records:', error);
+    }
+  };
+
+  // This effect is for the bed time alarm, not the audio stop timer. They are separate.
   useEffect(() => {
-    let timer;
+    let interval;
     if (isTimerRunning && remainingTime > 0) {
-      timer = setInterval(() => {
+      interval = setInterval(() => {
         setRemainingTime(prev => {
           if (prev <= 1) {
-            clearInterval(timer);
-            handleTimerComplete();
+            setIsTimerRunning(false);
+            // Trigger alarm or notification here
+            console.log('Timer finished!');
             return 0;
           }
           return prev - 1;
         });
       }, 1000);
-    } else if (remainingTime === 0) {
-      setIsTimerRunning(false);
     }
-
     return () => {
-      if (timer) clearInterval(timer);
+      if (interval) clearInterval(interval);
     };
   }, [isTimerRunning, remainingTime]);
 
-  // 计时器完成处理
-  const handleTimerComplete = async () => {
-    setIsTimerRunning(false);
-    
-    // 在web平台上不发送通知
-    if (Platform.OS !== 'web') {
-      // 发送通知
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: '睡眠提醒',
-          body: '时间到了，该睡觉了！',
-          sound: alarmSound,
-        },
-        trigger: null, // 立即发送
-      });
+  useEffect(() => {
+    if (timerMode === 'countdown') {
+      const updateRemainingTime = () => {
+        setRemainingTime(calculateRemainingTime());
+      };
+      
+      updateRemainingTime();
+      const interval = setInterval(updateRemainingTime, 60000); // Update every minute
+      
+      return () => clearInterval(interval);
     }
-    
-    // 播放选择的铃声
-    try {
-      // 这里可以根据需要扩展，使用expo-av播放自定义铃声
-      console.log('播放铃声:', alarmSound);
-    } catch (error) {
-      console.error('播放铃声失败:', error);
-    }
-  };
-
-  // 设置计时器
-  const setTimer = (minutes) => {
-    setTimerDuration(minutes);
-    setRemainingTime(minutes * 60);
-    setIsTimerRunning(false);
-  };
-
-  // 开始计时器
-  const startTimer = () => {
-    setIsTimerRunning(true);
-  };
-
-  // 暂停计时器
-  const pauseTimer = () => {
-    setIsTimerRunning(false);
-  };
-
-  // 重置计时器
-  const resetTimer = () => {
-    setIsTimerRunning(false);
-    setRemainingTime(timerDuration * 60);
-  };
-
-  // 保存睡眠记录
-  const saveSleepRecord = async (record) => {
-    const newRecord = {
-      id: Date.now().toString(),
-      ...record,
-      date: new Date().toISOString().split('T')[0],
-    };
-    const updatedRecords = [...sleepRecords, newRecord];
-    setSleepRecords(updatedRecords);
-    await AsyncStorage.setItem('sleepRecords', JSON.stringify(updatedRecords));
-  };
-
-  // 加载睡眠记录
-  const loadSleepRecords = async () => {
-    try {
-      const records = await AsyncStorage.getItem('sleepRecords');
-      if (records) {
-        setSleepRecords(JSON.parse(records));
-      }
-    } catch (error) {
-      console.error('加载睡眠记录失败:', error);
-    }
-  };
-
-  // 设置闹钟铃声
-  const setAlarmSoundPreference = (sound) => {
-    setAlarmSound(sound);
-    AsyncStorage.setItem('alarmSound', sound);
-  };
-
-  // 加载闹钟铃声偏好
-  const loadAlarmSoundPreference = async () => {
-    try {
-      const sound = await AsyncStorage.getItem('alarmSound');
-      if (sound) {
-        setAlarmSound(sound);
-      }
-    } catch (error) {
-      console.error('加载闹钟铃声偏好失败:', error);
-    }
-  };
+  }, [timerMode, timerDuration, targetTime, repeatMode]);
 
   useEffect(() => {
-    loadSleepRecords();
-    loadAlarmSoundPreference();
+    loadSleepRecordsFromStorage();
   }, []);
 
   return (
     <SleepContext.Provider
       value={{
-        sleepRecords,
+        // Existing values...
+        timerMode,
         timerDuration,
         isTimerRunning,
         remainingTime,
-        notificationPermission,
         alarmSound,
-        积分,
-        会员状态,
-        setMembership,
+        targetTime,
+        repeatMode,
+        sleepRecords,
         setTimer,
+        updateTimerMode,
+        updateTimePoint,
+        updateRepeatMode,
         startTimer,
         pauseTimer,
         resetTimer,
-        saveSleepRecord,
         setAlarmSoundPreference,
+        addSleepRecord,
+        updateSleepRecord,
+        deleteSleepRecord,
+        calculateSleepStats,
+
+        // 4. Expose new values
+        audioStopTimerDuration,
+        audioStopRemainingTime,
+        startAudioStopTimer,
+        cancelAudioStopTimer,
+        onAudioShouldStop,
       }}
     >
       {children}

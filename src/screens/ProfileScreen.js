@@ -1,12 +1,43 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { useThemeContext } from '../context/ThemeContext';
 import { useSleepContext } from '../context/SleepContext';
+import { useUserProfile } from '../context/UserProfileContext';
+import { responsiveFontSize, responsiveSize, spacing } from '../utils/responsive';
 
-const ProfileScreen = () => {
+const ProfileScreen = ({ navigation }) => {
   const { theme, toggleTheme, currentTheme } = useThemeContext();
   const isDarkMode = currentTheme === 'dark';
   const { notificationPermission } = useSleepContext();
+  const { userProfile, updateUserProfile } = useUserProfile();
+
+  // 格式化日期显示
+  const formatDate = (dateString) => {
+    if (!dateString) return '未设置';
+    const date = new Date(dateString);
+    return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
+  };
+
+  // 获取睡眠问题描述
+  const getSleepProblemsDescription = () => {
+    const problems = [];
+    Object.entries(userProfile.sleepProblems || {}).forEach(([key, problem]) => {
+      if (problem.hasProblem) {
+        const labels = {
+          difficultyFallingAsleep: '入睡困难',
+          wakingUpAtNight: '半夜清醒',
+          wakingUpEarly: '早醒',
+        };
+        problems.push(`${labels[key]}（严重程度: ${problem.severity}/5）`);
+      }
+    });
+    return problems.length > 0 ? problems.join('、') : '无';
+  };
+
+  // 编辑个人资料
+  const handleEditProfile = () => {
+    navigation.navigate('UserProfileSetupScreen');
+  };
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -17,6 +48,40 @@ const ProfileScreen = () => {
         </View>
       </View>
       
+      {/* 个人资料信息 */}
+      <View style={styles.infoSection}>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>个人资料</Text>
+        
+        <View style={[styles.infoItem, { backgroundColor: theme.card }]}>
+          <Text style={[styles.infoLabel, { color: theme.textSecondary }]}>出生日期</Text>
+          <Text style={[styles.infoValue, { color: theme.text }]}>
+            {formatDate(userProfile.birthDate)}
+          </Text>
+        </View>
+        
+        <View style={[styles.infoItem, { backgroundColor: theme.card }]}>
+          <Text style={[styles.infoLabel, { color: theme.textSecondary }]}>每日睡眠时间</Text>
+          <Text style={[styles.infoValue, { color: theme.text }]}>
+            {userProfile.dailySleepHours || 8}小时
+          </Text>
+        </View>
+        
+        <View style={[styles.infoItem, { backgroundColor: theme.card }]}>
+          <Text style={[styles.infoLabel, { color: theme.textSecondary }]}>睡眠问题</Text>
+          <Text style={[styles.infoValue, { color: theme.text }]}>
+            {getSleepProblemsDescription()}
+          </Text>
+        </View>
+        
+        <TouchableOpacity 
+          style={[styles.editButton, { backgroundColor: theme.primary }]}
+          onPress={handleEditProfile}
+        >
+          <Text style={styles.editButtonText}>编辑个人资料</Text>
+        </TouchableOpacity>
+      </View>
+      
+      {/* 账户信息 */}
       <View style={styles.infoSection}>
         <Text style={[styles.sectionTitle, { color: theme.text }]}>账户信息</Text>
         <View style={[styles.infoItem, { backgroundColor: theme.card }]}>
@@ -33,6 +98,7 @@ const ProfileScreen = () => {
         </View>
       </View>
       
+      {/* 设置 */}
       <View style={styles.settingsSection}>
         <Text style={[styles.sectionTitle, { color: theme.text }]}>设置</Text>
         
@@ -60,22 +126,6 @@ const ProfileScreen = () => {
             {notificationPermission === 'granted' ? '✅' : '❌'}
           </Text>
         </View>
-        
-        <TouchableOpacity style={[styles.settingItem, { backgroundColor: theme.card }]}>
-          <View style={styles.settingInfo}>
-            <Text style={[styles.settingLabel, { color: theme.text }]}>关于我们</Text>
-            <Text style={[styles.settingDescription, { color: theme.textSecondary }]}>版本 1.0.0</Text>
-          </View>
-          <Text style={styles.settingIcon}>ℹ️</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={[styles.settingItem, { backgroundColor: theme.card }]}>
-          <View style={styles.settingInfo}>
-            <Text style={[styles.settingLabel, { color: theme.text }]}>帮助与反馈</Text>
-            <Text style={[styles.settingDescription, { color: theme.textSecondary }]}>获取帮助或反馈问题</Text>
-          </View>
-          <Text style={styles.settingIcon}>❓</Text>
-        </TouchableOpacity>
       </View>
     </ScrollView>
   );
@@ -84,39 +134,39 @@ const ProfileScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
+    padding: spacing(20),
   },
   header: {
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: spacing(30),
   },
   title: {
-    fontSize: 28,
+    fontSize: responsiveFontSize(28),
     fontWeight: 'bold',
-    marginBottom: 20,
+    marginBottom: spacing(20),
   },
   avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: responsiveSize(100),
+    height: responsiveSize(100),
+    borderRadius: responsiveSize(50),
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
-    fontSize: 40,
+    fontSize: responsiveFontSize(40),
   },
   infoSection: {
-    marginBottom: 20,
+    marginBottom: spacing(20),
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: responsiveFontSize(18),
     fontWeight: 'bold',
-    marginBottom: 15,
+    marginBottom: spacing(15),
   },
   infoItem: {
-    padding: 15,
-    borderRadius: 12,
-    marginBottom: 10,
+    padding: spacing(15),
+    borderRadius: responsiveSize(12),
+    marginBottom: spacing(10),
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -127,12 +177,23 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   infoLabel: {
-    fontSize: 14,
-    marginBottom: 5,
+    fontSize: responsiveFontSize(14),
+    marginBottom: spacing(5),
   },
   infoValue: {
-    fontSize: 16,
+    fontSize: responsiveFontSize(16),
     fontWeight: '600',
+  },
+  editButton: {
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  editButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   settingsSection: {
     marginBottom: 20,
